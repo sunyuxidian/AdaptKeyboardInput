@@ -14,10 +14,6 @@
 @end
 
 @implementation ViewController
-- (void)dealloc
-{
-    [self uninstallAdaptKeyboardInput];
-}
 
 - (void)viewDidLoad {
     [super viewDidLoad];
