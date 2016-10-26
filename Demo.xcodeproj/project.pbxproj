@@ -14,6 +14,7 @@
 		E95432EC1DAF9CB400BC0193 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E95432EB1DAF9CB400BC0193 /* Assets.xcassets */; };
 		E95432EF1DAF9CB400BC0193 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = E95432ED1DAF9CB400BC0193 /* LaunchScreen.storyboard */; };
 		E95433011DAFA07E00BC0193 /* UIViewController+AdaptKeyboardInput.m in Sources */ = {isa = PBXBuildFile; fileRef = E95433001DAFA07E00BC0193 /* UIViewController+AdaptKeyboardInput.m */; };
+		E95E3EFF1DC057460095265B /* NextViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = E95E3EFE1DC057460095265B /* NextViewController.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,6 +30,8 @@
 		E95432F01DAF9CB400BC0193 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E95432FF1DAFA07E00BC0193 /* UIViewController+AdaptKeyboardInput.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "UIViewController+AdaptKeyboardInput.h"; sourceTree = "<group>"; };
 		E95433001DAFA07E00BC0193 /* UIViewController+AdaptKeyboardInput.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "UIViewController+AdaptKeyboardInput.m"; sourceTree = "<group>"; };
+		E95E3EFD1DC057460095265B /* NextViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NextViewController.h; sourceTree = "<group>"; };
+		E95E3EFE1DC057460095265B /* NextViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = NextViewController.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +74,8 @@
 				E95432ED1DAF9CB400BC0193 /* LaunchScreen.storyboard */,
 				E95432F01DAF9CB400BC0193 /* Info.plist */,
 				E95432DF1DAF9CB300BC0193 /* Supporting Files */,
+				E95E3EFD1DC057460095265B /* NextViewController.h */,
+				E95E3EFE1DC057460095265B /* NextViewController.m */,
 			);
 			path = Demo;
 			sourceTree = "<group>";
@@ -163,6 +168,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E95E3EFF1DC057460095265B /* NextViewController.m in Sources */,
 				E95432E71DAF9CB400BC0193 /* ViewController.m in Sources */,
 				E95432E41DAF9CB400BC0193 /* AppDelegate.m in Sources */,
 				E95432E11DAF9CB300BC0193 /* main.m in Sources */,
@@ -323,6 +329,7 @@
 				E95432F51DAF9CB400BC0193 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

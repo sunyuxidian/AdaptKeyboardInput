@@ -8,6 +8,7 @@
 
 #import "ViewController.h"
 #import "UIViewController+AdaptKeyboardInput.h"
+#import "NextViewController.h"
 @interface ViewController ()
 
 @property (weak, nonatomic) IBOutlet UITextField *textField;
@@ -32,7 +33,7 @@
 
 - (void)nextAction
 {
-    UIViewController *vc = [UIViewController new];
+    UIViewController *vc = [NextViewController new];
     vc.view.backgroundColor = [UIColor whiteColor];
     [self.navigationController pushViewController:vc animated:YES];
 }
@@ -47,6 +48,12 @@
 {
     [super viewWillDisappear:animated];
     [self uninstallAdaptKeyboardInput];
+}
+
+- (void)viewDidAppear:(BOOL)animated
+{
+    [super viewDidAppear:animated];
+    
 }
 
 - (UIView *)returnFirstResponderView
