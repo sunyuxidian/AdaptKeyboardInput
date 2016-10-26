@@ -5,11 +5,16 @@
 #import <objc/runtime.h>
 
 static void * keyboardHideTapGestureKey = (void *)@"keyboardHideTapGesture";
+static void * keyboardHidePanGestureKey = (void *)@"keyboardHidePanGestureKey";
 static void * observerContext = (void *)@"observerContext";
 static void * observerObjectKey = (void *)@"observerObjectKey";
 static void * observerObjectLockKey = (void *)@"observerObjectLockKey";
 static void * scrollViewKey = (void *)@"scrollViewKey";
 static void * inputBottomPaddingKey = (void *)@"inputBottomPaddingKey";
+
+static void * keyboardIsShowingKey = (void *)@"keyboardIsShowingKey";
+
+static void * keyboardDeltaKey = (void *)@"keyboardDeltaKey";
 
 
 #pragma mark -
@@ -19,7 +24,7 @@ static void * inputBottomPaddingKey = (void *)@"inputBottomPaddingKey";
 
 @implementation SYScrollViewObserverObject
 
-- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey,id> *)change context:(void *)context
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
 {
     if(context == observerContext && [object isKindOfClass:UIScrollView.class])
     {
@@ -41,15 +46,29 @@ static void * inputBottomPaddingKey = (void *)@"inputBottomPaddingKey";
 #pragma mark -
 @implementation UIViewController(KeyboardAdapt)
 
+- (void)SY_viewDidAppear:(BOOL)animated
+{
+    [self SY_viewDidAppear:animated];
+    [self implementInViewDidAppear];
+}
+
 #pragma mark - public method
 - (void)installAdaptKeyboardInput
 {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Method didAppear = class_getInstanceMethod([UIViewController class], @selector(viewDidAppear:)) ;
+        Method newDidAppear = class_getInstanceMethod([UIViewController class], @selector(SY_viewDidAppear:));
+        method_exchangeImplementations(didAppear,newDidAppear);
+    });
     [self SY_AddNotification];
+    [self SY_AddGestureAndObserver];
 }
 
 - (void)uninstallAdaptKeyboardInput
 {
     [self SY_ClearNotification];
+    [self SY_RemoveGestureAndObserver];
 }
 
 - (void)setInputBottomPadding:(CGFloat)distance
@@ -57,6 +76,33 @@ static void * inputBottomPaddingKey = (void *)@"inputBottomPaddingKey";
     objc_setAssociatedObject(self, inputBottomPaddingKey, @(distance), OBJC_ASSOCIATION_ASSIGN);
 }
 
+- (void)implementInViewDidAppear
+{
+    CGFloat delta = [self SY_KeyboardDelta];
+    UIView *view = [self SY_GetFirstRespondView];
+    
+    if([self keyboardIsShowing] && view)
+    {
+        CGRect fr = self.view.frame;
+        fr.origin.y = [self SY_SelfViewTop] + delta;
+        self.view.frame = fr;
+    }
+}
+
+#pragma mark - self.view Top
+- (CGFloat)SY_SelfViewTop
+{
+    CGFloat threshold = 0;
+    if(self.edgesForExtendedLayout == UIRectEdgeTop || self.edgesForExtendedLayout == UIRectEdgeAll)
+    {
+        threshold = 0;
+    }
+    else
+    {
+        threshold = 64;
+    }
+    return threshold;
+}
 #pragma mark - add/remove notification
 - (void)SY_AddNotification
 {
@@ -80,6 +126,16 @@ static void * inputBottomPaddingKey = (void *)@"inputBottomPaddingKey";
 }
 
 
+- (void)SY_SetKeyboardHidePanGesture:(UIPanGestureRecognizer *)keyboardHidePanGesture
+{
+    objc_setAssociatedObject(self, keyboardHidePanGestureKey, keyboardHidePanGesture, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+- (id)SY_KeyboardHidePanGesture
+{
+    return objc_getAssociatedObject(self, keyboardHidePanGestureKey);
+}
+
+
 - (void)SY_SetScrollView:(UIScrollView *)view
 {
     objc_setAssociatedObject(self, scrollViewKey, view, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -89,25 +145,86 @@ static void * inputBottomPaddingKey = (void *)@"inputBottomPaddingKey";
     return objc_getAssociatedObject(self, scrollViewKey);
 }
 
-#pragma mark - add/remove gesture
-- (void)SY_addHideTapGesture
+- (void)setKeyboardIsShowing:(BOOL)keyboardIsShowing
 {
-    [self SY_SetKeyboardHideTapGesture:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(SY_TapGestureAction)]];
-    [self.view addGestureRecognizer:self.SY_KeyboardHideTapGesture];
+    objc_setAssociatedObject(self,keyboardIsShowingKey,@(keyboardIsShowing),OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (BOOL)keyboardIsShowing
+{
+    return [objc_getAssociatedObject(self,keyboardIsShowingKey) boolValue];
+}
+
+- (void)SY_SetKeyboardDelta:(CGFloat)delta
+{
+    objc_setAssociatedObject(self,keyboardDeltaKey,@(delta),OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (CGFloat)SY_KeyboardDelta
+{
+    return [objc_getAssociatedObject(self, keyboardDeltaKey) floatValue];
+}
+
+
+#pragma mark - add/remove gesture
+- (void)SY_addHideGesture
+{
+    UITapGestureRecognizer *tap = [self SY_KeyboardHideTapGesture];
+    if(!tap)
+    {
+        tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(SY_TapGestureAction:)];
+        [self SY_SetKeyboardHideTapGesture:tap];
+    }
+    
+    if(![self.view.gestureRecognizers containsObject:tap])
+    {
+        [self.view addGestureRecognizer:tap];
+    }
+    
+    UIPanGestureRecognizer *pan = [self SY_KeyboardHidePanGesture];
+    if(!pan)
+    {
+        pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(SY_TapGestureAction:)];
+    }
+    
+    if(![self.view.gestureRecognizers containsObject:pan])
+    {
+        [self.view addGestureRecognizer:pan];
+    }
+    
     
 }
-- (void)SY_RemoveHideTapGesture
+- (void)SY_RemoveHideGesture
 {
     UIGestureRecognizer *ges = self.SY_KeyboardHideTapGesture;
     if([self.view.gestureRecognizers containsObject:ges])
     {
         [self.view removeGestureRecognizer:ges];
     }
+    
+    UIGestureRecognizer *pan = self.SY_KeyboardHidePanGesture;
+    if([self.view.gestureRecognizers containsObject:pan])
+    {
+        [self.view removeGestureRecognizer:pan];
+    }
 }
 
-- (void)SY_TapGestureAction
+- (void)SY_TapGestureAction:(UIGestureRecognizer *)gesture
 {
-    [self SY_CloseKeyboard];
+    BOOL condition = YES;
+    if([gesture isKindOfClass:[UIPanGestureRecognizer class]])
+    {
+        condition = gesture.state == UIGestureRecognizerStateBegan;
+    }
+    else
+    {
+        condition = gesture.state == UIGestureRecognizerStateEnded;
+    }
+    
+    if(condition)
+    {
+        [self SY_CloseKeyboard];
+    }
 }
 
 #pragma mark - close keyboard protocol
@@ -161,7 +278,8 @@ static void * inputBottomPaddingKey = (void *)@"inputBottomPaddingKey";
 - (void)SY_RemoveObserverForScrollView:(UIScrollView *)scrollView
 {
     if(scrollView == nil) return;
-    if([self SY_ObserverLocked]) [self SY_UnlockObserver];
+    if(![self SY_ObserverLocked]) return;
+    [self SY_UnlockObserver];
     
     [scrollView removeObserver:[self SY_GetSYScrollViewObserverObject]
                     forKeyPath:@"contentOffset"
@@ -194,17 +312,15 @@ static void * inputBottomPaddingKey = (void *)@"inputBottomPaddingKey";
 #pragma mark - keyboard notifications
 - (void)SY_UIViewControllerKeyboardShowNotification:(NSNotification *)notification
 {
+    [self SY_AddGestureAndObserver];
+    
     NSValue * keyboardFrame = [notification.userInfo objectForKey:UIKeyboardFrameEndUserInfoKey];
     CGRect keyboardRect = keyboardFrame.CGRectValue;
     CGFloat duration = [[notification.userInfo objectForKey:UIKeyboardAnimationDurationUserInfoKey] floatValue];
     NSInteger curve = [[notification.userInfo objectForKey:UIKeyboardAnimationCurveUserInfoKey] integerValue];
     
-    [self SY_addHideTapGesture];
-    
     UIView *view = [self SY_GetFirstRespondView];
-    UIScrollView *sView = [self SY_GetSuperScrollViewFromView:view];
-    [self SY_AddObserverForScrollView:sView];
-    
+
     CGRect viewToWindowRect = [self.view.window convertRect:view.frame fromView:view.superview];
     CGFloat viewTop = viewToWindowRect.origin.y;
     CGFloat keyboardTop = keyboardRect.origin.y;
@@ -213,14 +329,22 @@ static void * inputBottomPaddingKey = (void *)@"inputBottomPaddingKey";
     CGFloat padding = [self SY_getInputBottom:view];
  
     CGFloat delta = keyboardTop - (viewTop + viewHeight + padding);
-    if(delta < 0)
+    
+//    CGFloat threshold = [self SY_SelfViewTop];
+    
+    if(view && (delta < 0 || (delta > 0 && self.keyboardIsShowing)))//cover || update when showing
     {
+        [self SY_SetKeyboardDelta:delta];
         [UIView beginAnimations:@"keyboardShow" context:nil];
         [UIView setAnimationCurve:curve];
         [UIView setAnimationDuration:duration];
-        self.view.transform = CGAffineTransformMakeTranslation(0, delta);
+        CGRect frame = self.view.frame;
+        frame.origin.y += delta;
+        self.view.frame = frame;
         [UIView commitAnimations];
     }
+    
+    self.keyboardIsShowing = YES;
 }
 
 - (void)SY_UIViewControllerKeyboardHideNotification:(NSNotification *)notification
@@ -228,20 +352,43 @@ static void * inputBottomPaddingKey = (void *)@"inputBottomPaddingKey";
     CGFloat duration = [[notification.userInfo objectForKey:UIKeyboardAnimationDurationUserInfoKey] floatValue];
     NSInteger curve = [[notification.userInfo objectForKey:UIKeyboardAnimationCurveUserInfoKey] integerValue];
     
-    [self SY_RemoveHideTapGesture];
-    [self SY_RemoveObserverForScrollView:[self SY_ScrollView]];
+    CGFloat threshold = [self SY_SelfViewTop];
+    [self SY_RemoveGestureAndObserver];
     
-    if(!CGAffineTransformEqualToTransform(self.view.transform,CGAffineTransformIdentity))
+    BOOL animated = self.view.frame.origin.y != threshold;
+    
+    if(animated)
     {
         [UIView beginAnimations:@"keyboardHide" context:nil];
         [UIView setAnimationCurve:curve];
         [UIView setAnimationDuration:duration];
-        self.view.transform = CGAffineTransformIdentity;
+    }
+    CGRect frame = self.view.frame;
+    frame.origin.y = threshold;
+    self.view.frame = frame;
+    
+    if(animated)
+    {
         [UIView commitAnimations];
     }
-
+    
+    self.keyboardIsShowing = NO;
 }
 
+- (void)SY_AddGestureAndObserver
+{
+    [self SY_addHideGesture];
+    
+    UIView *view = [self SY_GetFirstRespondView];
+    UIScrollView *sView = [self SY_GetSuperScrollViewFromView:view];
+    [self SY_AddObserverForScrollView:sView];
+}
+
+- (void)SY_RemoveGestureAndObserver
+{
+    [self SY_RemoveHideGesture];
+    [self SY_RemoveObserverForScrollView:[self SY_ScrollView]];
+}
 #pragma mark - find firstResponder view
 /**
  BFS find firstResponder View
@@ -250,6 +397,14 @@ static void * inputBottomPaddingKey = (void *)@"inputBottomPaddingKey";
  */
 - (UIView *)SY_GetFirstRespondView
 {
+    if([self respondsToSelector:@selector(returnFirstResponderView)])
+    {
+        if([[self returnFirstResponderView] isKindOfClass:[UIView class]])
+        {
+            return [self returnFirstResponderView];
+        }
+    }
+    
     if(self.view.subviews.count == 0)
     {
         return nil;

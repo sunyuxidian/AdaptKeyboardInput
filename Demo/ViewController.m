@@ -10,6 +10,7 @@
 #import "UIViewController+AdaptKeyboardInput.h"
 @interface ViewController ()
 
+@property (weak, nonatomic) IBOutlet UITextField *textField;
 @property (weak, nonatomic) IBOutlet UIScrollView *scrollView;
 @end
 
@@ -18,15 +19,38 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     // Do any additional setup after loading the view, typically from a nib.
-    self.scrollView.contentSize = CGSizeMake(self.scrollView.bounds.size.width, self.scrollView.bounds.size.height+20);
+    self.scrollView.alwaysBounceVertical = YES;
+    
+    UIButton *nextButton = [UIButton buttonWithType:0];
+    [nextButton addTarget:self action:@selector(nextAction) forControlEvents:UIControlEventTouchUpInside];
+    nextButton.backgroundColor = [UIColor redColor];
+    [nextButton setTitle:@"Next" forState:UIControlStateNormal];
+    [nextButton setTitleColor:UIColor.whiteColor  forState:UIControlStateNormal];
+    nextButton.frame = CGRectMake(0, 300, 200, 24);
+    [self.view addSubview:nextButton];
+}
+
+- (void)nextAction
+{
+    UIViewController *vc = [UIViewController new];
+    vc.view.backgroundColor = [UIColor whiteColor];
+    [self.navigationController pushViewController:vc animated:YES];
+}
+- (void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
     [self installAdaptKeyboardInput];
+    [self.textField becomeFirstResponder];
 }
 
-
-- (void)didReceiveMemoryWarning {
-    [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
+- (void)viewWillDisappear:(BOOL)animated
+{
+    [super viewWillDisappear:animated];
+    [self uninstallAdaptKeyboardInput];
 }
 
-
+- (UIView *)returnFirstResponderView
+{
+    return self.textField;
+}
 @end
