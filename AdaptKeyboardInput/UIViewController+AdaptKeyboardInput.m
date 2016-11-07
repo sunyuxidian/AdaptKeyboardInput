@@ -14,9 +14,6 @@ static void * inputBottomPaddingKey = (void *)@"inputBottomPaddingKey";
 
 static void * keyboardIsShowingKey = (void *)@"keyboardIsShowingKey";
 
-static void * keyboardDeltaKey = (void *)@"keyboardDeltaKey";
-
-
 #pragma mark -
 @interface SYScrollViewObserverObject : NSObject
 @property (nonatomic,weak)id<SYUIViewControllerAdaptKeyboardInputDelegate>controllerAdaptiveKeyboardInputDelegate;
@@ -46,27 +43,16 @@ static void * keyboardDeltaKey = (void *)@"keyboardDeltaKey";
 #pragma mark -
 @implementation UIViewController(KeyboardAdapt)
 
-- (void)SY_viewDidAppear:(BOOL)animated
-{
-    [self SY_viewDidAppear:animated];
-    [self implementInViewDidAppear];
-}
-
 #pragma mark - public method
 - (void)installAdaptKeyboardInput
 {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        Method didAppear = class_getInstanceMethod([UIViewController class], @selector(viewDidAppear:)) ;
-        Method newDidAppear = class_getInstanceMethod([UIViewController class], @selector(SY_viewDidAppear:));
-        method_exchangeImplementations(didAppear,newDidAppear);
-    });
     [self SY_AddNotification];
     [self SY_AddGestureAndObserver];
 }
 
 - (void)uninstallAdaptKeyboardInput
 {
+    [self SY_CloseKeyboard];
     [self SY_ClearNotification];
     [self SY_RemoveGestureAndObserver];
 }
@@ -76,33 +62,6 @@ static void * keyboardDeltaKey = (void *)@"keyboardDeltaKey";
     objc_setAssociatedObject(self, inputBottomPaddingKey, @(distance), OBJC_ASSOCIATION_ASSIGN);
 }
 
-- (void)implementInViewDidAppear
-{
-    CGFloat delta = [self SY_KeyboardDelta];
-    UIView *view = [self SY_GetFirstRespondView];
-    
-    if([self keyboardIsShowing] && view)
-    {
-        CGRect fr = self.view.frame;
-        fr.origin.y = [self SY_SelfViewTop] + delta;
-        self.view.frame = fr;
-    }
-}
-
-#pragma mark - self.view Top
-- (CGFloat)SY_SelfViewTop
-{
-    CGFloat threshold = 0;
-    if(self.edgesForExtendedLayout == UIRectEdgeTop || self.edgesForExtendedLayout == UIRectEdgeAll)
-    {
-        threshold = 0;
-    }
-    else
-    {
-        threshold = 64;
-    }
-    return threshold;
-}
 #pragma mark - add/remove notification
 - (void)SY_AddNotification
 {
@@ -154,17 +113,6 @@ static void * keyboardDeltaKey = (void *)@"keyboardDeltaKey";
 {
     return [objc_getAssociatedObject(self,keyboardIsShowingKey) boolValue];
 }
-
-- (void)SY_SetKeyboardDelta:(CGFloat)delta
-{
-    objc_setAssociatedObject(self,keyboardDeltaKey,@(delta),OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}
-
-- (CGFloat)SY_KeyboardDelta
-{
-    return [objc_getAssociatedObject(self, keyboardDeltaKey) floatValue];
-}
-
 
 #pragma mark - add/remove gesture
 - (void)SY_addHideGesture
@@ -312,6 +260,7 @@ static void * keyboardDeltaKey = (void *)@"keyboardDeltaKey";
 #pragma mark - keyboard notifications
 - (void)SY_UIViewControllerKeyboardShowNotification:(NSNotification *)notification
 {
+    NSLog(@">>>>> %@",self);
     [self SY_AddGestureAndObserver];
     
     NSValue * keyboardFrame = [notification.userInfo objectForKey:UIKeyboardFrameEndUserInfoKey];
@@ -321,25 +270,20 @@ static void * keyboardDeltaKey = (void *)@"keyboardDeltaKey";
     
     UIView *view = [self SY_GetFirstRespondView];
 
-    CGRect viewToWindowRect = [self.view.window convertRect:view.frame fromView:view.superview];
-    CGFloat viewTop = viewToWindowRect.origin.y;
-    CGFloat keyboardTop = keyboardRect.origin.y;
+    CGRect inputFrame = [self.view convertRect:view.frame fromView:view.superview];
+    CGFloat keyboardHeight = keyboardRect.size.height;
     
-    CGFloat viewHeight = view.bounds.size.height;
     CGFloat padding = [self SY_getInputBottom:view];
  
-    CGFloat delta = keyboardTop - (viewTop + viewHeight + padding);
+    CGFloat delta = self.view.bounds.size.height - (inputFrame.origin.y+inputFrame.size.height+padding+keyboardHeight);
     
-//    CGFloat threshold = [self SY_SelfViewTop];
-    
-    if(view && (delta < 0 || (delta > 0 && self.keyboardIsShowing)))//cover || update when showing
+    if(view && delta < 0)//cover || update when showing
     {
-        [self SY_SetKeyboardDelta:delta];
         [UIView beginAnimations:@"keyboardShow" context:nil];
         [UIView setAnimationCurve:curve];
         [UIView setAnimationDuration:duration];
         CGRect frame = self.view.frame;
-        frame.origin.y += delta;
+        frame.origin.y = delta;
         self.view.frame = frame;
         [UIView commitAnimations];
     }
@@ -352,10 +296,9 @@ static void * keyboardDeltaKey = (void *)@"keyboardDeltaKey";
     CGFloat duration = [[notification.userInfo objectForKey:UIKeyboardAnimationDurationUserInfoKey] floatValue];
     NSInteger curve = [[notification.userInfo objectForKey:UIKeyboardAnimationCurveUserInfoKey] integerValue];
     
-    CGFloat threshold = [self SY_SelfViewTop];
     [self SY_RemoveGestureAndObserver];
     
-    BOOL animated = self.view.frame.origin.y != threshold;
+    BOOL animated = self.view.frame.origin.y != 0;
     
     if(animated)
     {
@@ -364,7 +307,7 @@ static void * keyboardDeltaKey = (void *)@"keyboardDeltaKey";
         [UIView setAnimationDuration:duration];
     }
     CGRect frame = self.view.frame;
-    frame.origin.y = threshold;
+    frame.origin.y = 0;
     self.view.frame = frame;
     
     if(animated)
@@ -397,14 +340,6 @@ static void * keyboardDeltaKey = (void *)@"keyboardDeltaKey";
  */
 - (UIView *)SY_GetFirstRespondView
 {
-    if([self respondsToSelector:@selector(returnFirstResponderView)])
-    {
-        if([[self returnFirstResponderView] isKindOfClass:[UIView class]])
-        {
-            return [self returnFirstResponderView];
-        }
-    }
-    
     if(self.view.subviews.count == 0)
     {
         return nil;
@@ -418,14 +353,15 @@ static void * keyboardDeltaKey = (void *)@"keyboardDeltaKey";
         [queue removeObjectAtIndex:0];
         for (NSInteger i = 0; i < first.subviews.count; i++) {
             UIView *node = first.subviews[i];
-            if(([node isKindOfClass:[UITextView class]] || [node isKindOfClass:[UITextField class]]) &&
-               [node isFirstResponder])
+            if(([node isKindOfClass:[UITextView class]] || [node isKindOfClass:[UITextField class]])
+               && node.isFirstResponder)
             {
                 return node;
             }
             [queue addObject:node];
         }
     }
+    
     return nil;
 }
 

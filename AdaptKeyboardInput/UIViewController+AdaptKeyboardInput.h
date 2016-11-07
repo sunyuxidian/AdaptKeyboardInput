@@ -8,8 +8,6 @@
 @optional
 - (void)SY_CloseKeyboard;
 - (void)setInputBottomPadding:(CGFloat)distance;
-- (UIView *)returnFirstResponderView;
-
 @end
 
 @interface UIViewController(AdaptKeyboardInput)<SYUIViewControllerAdaptKeyboardInputDelegate>

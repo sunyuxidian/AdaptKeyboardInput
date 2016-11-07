@@ -37,9 +37,11 @@
     vc.view.backgroundColor = [UIColor whiteColor];
     [self.navigationController pushViewController:vc animated:YES];
 }
-- (void)viewWillAppear:(BOOL)animated
+
+
+- (void)viewDidAppear:(BOOL)animated
 {
-    [super viewWillAppear:animated];
+    [super viewDidAppear:animated];
     [self installAdaptKeyboardInput];
     [self.textField becomeFirstResponder];
 }
@@ -50,14 +52,4 @@
     [self uninstallAdaptKeyboardInput];
 }
 
-- (void)viewDidAppear:(BOOL)animated
-{
-    [super viewDidAppear:animated];
-    
-}
-
-- (UIView *)returnFirstResponderView
-{
-    return self.textField;
-}
 @end
